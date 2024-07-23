@@ -170,7 +170,7 @@ def do(param):
 
 
 def save_to_db(user_id, nutrition_info):
-    connection = pymysql.connect(**db_config)
+    connection = create_db_connection()
     try:
         with connection.cursor() as cursor:
             sql = """
@@ -206,9 +206,24 @@ def send():
 
     nutrition_info = do(food_name)
 
-    save_to_db(user_id, nutrition_info)
+    # save_to_db(user_id, nutrition_info)
 
     return jsonify(nutrition_info)
+
+@app.route("/api/send2", methods=["POST"])
+def send2():
+    data = request.json
+    user_id = data.get("user_id")
+    nutrition_info= data.get("nutrition_info")
+    try:
+        save_to_db(user_id, nutrition_info)
+        return jsonify({"message":"good"}),200
+    except:
+        return jsonify({"message":"DB save error"}),500
+
+    
+    
+
 
 
 @app.route("/api/register", methods=["POST"])
@@ -251,7 +266,6 @@ def register():
 # 특정 음식을 삭제하는 엔드포인트
 @app.route("/api/delete_food", methods=["DELETE"])
 def delete_food():
-    print("음식삭제!")
     user_id = request.args.get("ID")
     date = request.args.get("DATE")
     food_index = request.args.get("FOOD_INDEX")
@@ -285,7 +299,61 @@ def delete_food():
             cursor.close()
             connection.close()
 
+@app.route('/api/monthly', methods=['POST'])
+def get_monthly_food():
+    data = request.json
+    year = data.get('year') 
+    month = data.get('month')
+    UID = data.get('UID')
+    if not year or not month:
+        return jsonify({"error": "Year and month are required"}), 400
 
+    connection = create_db_connection()
+    try:
+        with connection.cursor() as cursor:
+            sql = """
+                SELECT DATE, FOOD_INDEX, FOOD_NAME, FOOD_PT, FOOD_FAT, FOOD_CH, FOOD_KCAL
+                FROM FOOD
+                WHERE YEAR(DATE) = %s AND MONTH(DATE) = %s
+                AND ID = %s
+                ORDER BY DATE
+            """
+            cursor.execute(sql, (year, month, UID))
+            results = cursor.fetchall()
+            monthly_data = {}
+
+            for row in results:
+                day = row[0].day
+                food_info = {
+                    "food_index": row[1],
+                    "food_name": row[2],
+                    "protein": row[3],
+                    "fat": row[4],
+                    "carbohydrates": row[5],
+                    "calories": row[6]
+                }
+
+                # Ensuring the output order
+                food_info_ordered = {
+                    "food_index": food_info["food_index"],
+                    "food_name": food_info["food_name"],
+                    "protein": food_info["protein"],
+                    "fat": food_info["fat"],
+                    "carbohydrates": food_info["carbohydrates"],
+                    "calories": food_info["calories"]
+                }
+
+                if day not in monthly_data:
+                    monthly_data[day] = []
+
+                monthly_data[day].append(food_info_ordered)
+
+            # Create a list of 31 days, each day is a list of food items (which may be empty)
+            grouped_data = [monthly_data.get(day, []) for day in range(1, 32)]
+
+            return jsonify(grouped_data)
+    finally:
+        connection.close()
 if __name__ == "__main__":
     print("Starting Flask application")  # 디버깅 메시지
     # insert_test_data()  # 애플리케이션 시작 시 테스트 데이터 삽입
