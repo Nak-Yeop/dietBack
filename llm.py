@@ -15,6 +15,7 @@ model = AzureChatOpenAI(
 )
 
 class NutritionInfo(BaseModel):
+    food_name: str = Field(description="The name of the food")
     calorie: str = Field(description="The amount of Calories")
     carbohydrate: str = Field(description="The amount of Carbohydrate")
     protein: str = Field(description="The amount of Protein")
@@ -25,7 +26,7 @@ output_parser = JsonOutputParser(pydantic_object=NutritionInfo)
 prompt_template = ChatPromptTemplate.from_template(
     """
     음식이 입력되면 영양정보를 분석해줘
-    필수 요소는 칼로리, 탄수화물, 단백질, 지방이야
+    필수 요소는 음식 이름, 칼로리, 탄수화물, 단백질, 지방이야
     입력: {string}
     
     {format_instructions}
