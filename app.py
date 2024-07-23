@@ -2,7 +2,6 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import AzureChatOpenAI
 from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_core.output_parsers import JsonOutputParser
-
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import mysql.connector
@@ -106,7 +105,7 @@ def save_to_db(user_id, nutrition_info, connection):
     cursor = connection.cursor()
     try:
         sql = """
-        INSERT INTO FOOD (ID, DATE, FOOD_NAME, FOOD_PT, FOOD_FAT, FOOD_CH, FOOD_KCAL)
+        INSERT INTO FOOD (user_id, DATE, FOOD_NAME, FOOD_PT, FOOD_FAT, FOOD_CH, FOOD_KCAL)
         VALUES (%s, %s, %s, %s, %s, %s, %s)
         """
         cursor.execute(
