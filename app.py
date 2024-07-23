@@ -114,11 +114,11 @@ def save_to_db(user_id, nutrition_info, connection):
             (
                 user_id,
                 datetime.now(),
-                nutrition_info["food_name"],
-                nutrition_info["protein"],
-                nutrition_info["fat"],
-                nutrition_info["carbohydrate"],
-                nutrition_info["calorie"],
+                nutrition_info['food_name'],
+                nutrition_info['protein'],
+                nutrition_info['fat'],
+                nutrition_info['carbohydrate'],
+                nutrition_info['calorie']
             ),
         )
         print("Data saved to database")  # Debugging 출력 추가
