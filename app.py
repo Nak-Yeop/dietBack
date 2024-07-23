@@ -188,7 +188,7 @@ def send():
     if not user_id or not food_name:
         return jsonify({"error": "user_id and food_name are required"}), 400
 
-    nutrition_info = llm.do(food_name)
+    nutrition_info = do(food_name)
     
     save_to_db(user_id, nutrition_info)
     
@@ -234,24 +234,26 @@ def register():
 @app.route('/api/monthly', methods=['POST'])
 def get_monthly_food():
     data = request.json
-    year = data.get('year') 
+    year = data.get('year')
     month = data.get('month')
-    # year = request.args.get('year')
-    # month = request.args.get('month')
+    UID = data.get('UID')
 
+    print(UID)
     if not year or not month:
         return jsonify({"error": "Year and month are required"}), 400
 
     connection = create_db_connection()
     try:
         with connection.cursor() as cursor:
+            # UID를 사용하는 경우 쿼리문에 UID 조건 추가
             sql = """
                 SELECT DATE, FOOD_INDEX, FOOD_NAME, FOOD_PT, FOOD_FAT, FOOD_CH, FOOD_KCAL
                 FROM FOOD
                 WHERE YEAR(DATE) = %s AND MONTH(DATE) = %s
+                AND ID = %s
                 ORDER BY DATE
             """
-            cursor.execute(sql, (year, month))
+            cursor.execute(sql, (year, month, UID))
             results = cursor.fetchall()
             monthly_data = {}
 
@@ -287,6 +289,44 @@ def get_monthly_food():
             return jsonify(grouped_data)
     finally:
         connection.close()
+
+# 특정 음식을 삭제하는 엔드포인트
+@app.route('/api/delete_food', methods=['DELETE'])
+def delete_food():
+    print("음식삭제!")
+    user_id = request.args.get('ID')
+    date = request.args.get('DATE')
+    food_index = request.args.get('FOOD_INDEX')
+
+    if not user_id or not date or not food_index:
+        return jsonify({"error": "필수 정보가 누락되었습니다."}), 400
+
+    connection = create_db_connection()
+    if connection is None:
+        return jsonify({"error": "데이터베이스 연결 실패"}), 500
+
+    try:
+        cursor = connection.cursor()
+        delete_query = """
+        DELETE FROM FOOD
+        WHERE ID = %s AND DATE = %s AND FOOD_INDEX = %s
+        """
+        cursor.execute(delete_query, (user_id, date, food_index))
+        connection.commit()
+
+        if cursor.rowcount == 0:
+            return jsonify({"message": "삭제할 데이터가 없습니다."}), 404
+
+        return jsonify({"message": "음식이 성공적으로 삭제되었습니다."}), 200
+
+    except Error as e:
+        return jsonify({"error": str(e)}), 500
+
+    finally:
+        if connection.is_connected():
+            cursor.close()
+            connection.close()
+
 
 if __name__ == '__main__':
     print("Starting Flask application")  # 디버깅 메시지
