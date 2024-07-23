@@ -41,6 +41,7 @@ def register():
     data = request.json
     
     if not data or 'id' not in data or 'pw' not in data:
+        print(1)
         return jsonify({"error": "Invalid input"}), 400
 
     connection = create_db_connection()
