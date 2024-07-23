@@ -68,44 +68,44 @@ def register():
             cursor.close()
             connection.close()
 
-# 애플리케이션 시작 시 임의의 데이터 삽입
-# def insert_test_data():
-#     print("Inserting test data...")
-#     data = {
-#         'id': "33333",
-#         'pw': '2',
-#         'bodyweight': 70,
-#         'height': 178,
-#         'age': 25,
-#     }
+#애플리케이션 시작 시 임의의 데이터 삽입
+def insert_test_data():
+    print("Inserting test data...")
+    data = {
+        'id': "33333",
+        'pw': '2',
+        'bodyweight': 70,
+        'height': 178,
+        'age': 25,
+    }
 
-#     connection = create_db_connection()
-#     if connection is None:
-#         print("Database connection failed")
-#         return
+    connection = create_db_connection()
+    if connection is None:
+        print("Database connection failed")
+        return
 
-#     try:
-#         cursor = connection.cursor()
-#         query = """INSERT INTO USER (ID, PASSWORD, BODY_WEIGHT, HEIGHT, AGE) 
-#                    VALUES (%s, %s, %s, %s, %s)"""
-#         values = (
-#             data['id'],
-#             data['pw'],
-#             data['bodyweight'],
-#             data['height'],
-#             data['age']
-#         )
-#         cursor.execute(query, values)
-#         connection.commit()
-#         print("Test user inserted successfully")
-#     except Error as e:
-#         print(f"An error occurred: {str(e)}")
-#     finally:
-#         if connection.is_connected():
-#             cursor.close()
-#             connection.close()
+    try:
+        cursor = connection.cursor()
+        query = """INSERT INTO USER (ID, PASSWORD, BODY_WEIGHT, HEIGHT, AGE) 
+                   VALUES (%s, %s, %s, %s, %s)"""
+        values = (
+            data['id'],
+            data['pw'],
+            data['bodyweight'],
+            data['height'],
+            data['age']
+        )
+        cursor.execute(query, values)
+        connection.commit()
+        print("Test user inserted successfully")
+    except Error as e:
+        print(f"An error occurred: {str(e)}")
+    finally:
+        if connection.is_connected():
+            cursor.close()
+            connection.close()
 
 if __name__ == '__main__':
     print("Starting application...")
-    # insert_test_data()  # 애플리케이션 시작 시 테스트 데이터 삽입
+    insert_test_data()  # 애플리케이션 시작 시 테스트 데이터 삽입
     app.run(debug=True)  # 기본 포트(5000)에서 실행
