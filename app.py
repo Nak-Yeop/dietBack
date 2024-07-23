@@ -208,14 +208,17 @@ def register():
 
     try:
         cursor = connection.cursor()
-        query = """INSERT INTO USER (ID, PASSWORD, BODY_WEIGHT, HEIGHT,AGE) 
-                   VALUES (%s, %s, %s, %s, %s)"""
+        query = """INSERT INTO USER (ID, PASSWORD, BODY_WEIGHT, HEIGHT, AGE, GENDER, ACTIVITY, RDI) 
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
         values = (
             data['id'],
             data['pw'],
             data['bodyweight'],
             data['height'],
-            data['age']
+            data['age'],
+            data['gender'],
+            data['activity'],
+            None  # RDI 값을 기본값으로 설정 (필요에 따라 계산 후 설정 가능)
         )
         cursor.execute(query, values)
         connection.commit()
