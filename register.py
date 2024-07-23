@@ -10,7 +10,7 @@ load_dotenv()
 db_host = os.getenv('DB_HOST')
 db_name = os.getenv('DB_NAME')
 db_user = os.getenv('DB_USER')
-db_password = os.getenv('DB_PASSWORD')
+db_password = os.getenv('DB_PASS')
 
 # 환경 변수 확인을 위한 디버그 출력
 print(f"DB_HOST: {db_host}")
@@ -41,7 +41,6 @@ def register():
     data = request.json
     
     if not data or 'id' not in data or 'pw' not in data:
-        print(1)
         return jsonify({"error": "Invalid input"}), 400
 
     connection = create_db_connection()
@@ -50,14 +49,17 @@ def register():
 
     try:
         cursor = connection.cursor()
-        query = """INSERT INTO USER (ID, PASSWORD, BODY_WEIGHT, HEIGHT,AGE) 
-                   VALUES (%s, %s, %s, %s, %s)"""
+        query = """INSERT INTO USER (ID, PASSWORD, BODY_WEIGHT, HEIGHT, AGE, GENDER, ACTIVITY, RDI) 
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
         values = (
             data['id'],
             data['pw'],
             data['bodyweight'],
             data['height'],
-            data['age']
+            data['age'],
+            data['gender'],
+            data['activity'],
+            None  # RDI 값을 기본값으로 설정 (필요에 따라 계산 후 설정 가능)
         )
         cursor.execute(query, values)
         connection.commit()
@@ -69,15 +71,17 @@ def register():
             cursor.close()
             connection.close()
 
-#애플리케이션 시작 시 임의의 데이터 삽입
+# 애플리케이션 시작 시 임의의 데이터 삽입
 def insert_test_data():
     print("Inserting test data...")
     data = {
-        'id': "33333",
+        'id': "admin2",
         'pw': '2',
         'bodyweight': 70,
         'height': 178,
         'age': 25,
+        'gender': 1,
+        'activity': 5
     }
 
     connection = create_db_connection()
@@ -87,14 +91,17 @@ def insert_test_data():
 
     try:
         cursor = connection.cursor()
-        query = """INSERT INTO USER (ID, PASSWORD, BODY_WEIGHT, HEIGHT, AGE) 
-                   VALUES (%s, %s, %s, %s, %s)"""
+        query = """INSERT INTO USER (ID, PASSWORD, BODY_WEIGHT, HEIGHT, AGE, GENDER, ACTIVITY, RDI) 
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
         values = (
             data['id'],
             data['pw'],
             data['bodyweight'],
             data['height'],
-            data['age']
+            data['age'],
+            data['gender'],
+            data['activity'],
+            None  # RDI 값을 기본값으로 설정 (필요에 따라 계산 후 설정 가능)
         )
         cursor.execute(query, values)
         connection.commit()
@@ -107,6 +114,6 @@ def insert_test_data():
             connection.close()
 
 if __name__ == '__main__':
-    print("Starting application...")
+    print("Starting application…")
     insert_test_data()  # 애플리케이션 시작 시 테스트 데이터 삽입
     app.run(debug=True)  # 기본 포트(5000)에서 실행

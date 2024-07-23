@@ -45,15 +45,22 @@ def login():
         return jsonify({"error": "Database connection failed"}), 500
 
     try:
-        cursor = connection.cursor(dictionary=True)
-        query = "SELECT * FROM USER WHERE ID = %s AND PASSWORD = %s"
-        cursor.execute(query, (data["id"], data["password"]))
-        user = cursor.fetchone()
-
-        if user:
-            return jsonify({"message": "Login successful", "user": user})
-        else:
-            return jsonify({"error": "Invalid credentials"}), 401
+        cursor = connection.cursor()
+        query = """INSERT INTO USER (ID, PASSWORD, BODY_WEIGHT, HEIGHT, AGE, GENDER, ACTIVITY, RDI) 
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
+        values = (
+            data['id'],
+            data['pw'],
+            data['bodyweight'],
+            data['height'],
+            data['age'],
+            data['gender'],
+            data['activity'],
+            None  # RDI 값을 기본값으로 설정 (필요에 따라 계산 후 설정 가능)
+        )
+        cursor.execute(query, values)
+        connection.commit()
+        return jsonify({"message": "User registered successfully"}), 201
     except Error as e:
         print(f"Database query error: {e}")
         return jsonify({"error": "Database query failed"}), 500
