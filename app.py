@@ -46,7 +46,164 @@ def create_db_connection():
 @app.route("/api/login", methods=["POST"])
 def login():
     data = request.json
-    if not data or "id" not in data or "password" not in data:
+    print(f"Received login request for user ID: {data.get('id')}")  # 디버깅 메시지
+    
+    connection = create_db_connection()
+    if connection is None:
+        print("Database connection failed")  # 디버깅 메시지
+        return jsonify({"error": "Database connection failed"}), 500
+
+    try:
+        cursor = connection.cursor(dictionary=True)
+        query = "SELECT * FROM USER WHERE ID = %s AND PASSWORD = %s"
+        print(f"Executing query: {query}")  # 디버깅 메시지
+        cursor.execute(query, (data['id'], data['password']))
+        user = cursor.fetchone()
+
+        if user:
+            print(f"Login successful for user: {user['ID']}")  # 디버깅 메시지
+            user.pop('PASSWORD', None)
+            return jsonify({"message": "Login successful", "user": user}), 200
+        else:
+            print("Invalid credentials")  # 디버깅 메시지
+            return jsonify({"error": "Invalid credentials"}), 401
+
+    except Error as e:
+        print(f"Database error occurred: {str(e)}")  # 디버깅 메시지
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+    finally:
+        if connection.is_connected():
+            cursor.close()
+            connection.close()
+            print("Database connection closed")  # 디버깅 메시지
+
+def insert_test_data():
+    print("Inserting test data...")  # 디버깅 메시지
+    
+    # 콘솔에서 사용자 입력 받기
+    user_id = input("Enter user ID: ")
+    user_password = input("Enter user password: ")
+    
+    data = {
+        'id': user_id,
+        'password': user_password,
+        'bodyweight': 70,  # 예시 데이터
+        'height': 178,     # 예시 데이터
+        'age': 30          # 예시 데이터
+    }
+
+    connection = create_db_connection()
+    if connection is None:
+        print("Database connection failed")
+        return
+
+    try:
+        cursor = connection.cursor()
+        
+        # 아이디 중복 확인
+        query = "SELECT * FROM USER WHERE ID = %s"
+        cursor.execute(query, (data['id'],))
+        existing_user = cursor.fetchone()
+        
+        if existing_user:
+            print(f"User ID {data['id']} already exists. Skipping insertion.")  # 디버깅 메시지
+        else:
+            query = """INSERT INTO USER (ID, PASSWORD, BODY_WEIGHT, HEIGHT, AGE) 
+                       VALUES (%s, %s, %s, %s, %s)"""
+            values = (
+                data['id'],
+                data['password'],
+                data['bodyweight'],
+                data['height'],
+                data['age']
+            )
+            cursor.execute(query, values)
+            connection.commit()
+            print("Test user inserted successfully")  # 디버깅 메시지
+    except Error as e:
+        print(f"An error occurred: {str(e)}")  # 디버깅 메시지
+    finally:
+        if connection.is_connected():
+            cursor.close()
+            connection.close()
+            print("Database connection closed")  # 디버깅 메시지
+
+model = AzureChatOpenAI(
+    azure_deployment=os.getenv("AZURE_OPENAI_DEPLOYMENT"),  # gpt-4o is set by env
+    temperature=1.0
+)
+
+class NutritionInfo(BaseModel):
+    calorie: str = Field(description="The amount of Calories")
+    carbohydrate: str = Field(description="The amount of Carbohydrate")
+    protein: str = Field(description="The amount of Protein")
+    fat: str = Field(description="The amount of Fat")
+
+output_parser = JsonOutputParser(pydantic_object=NutritionInfo)
+
+prompt_template = ChatPromptTemplate.from_template(
+    """
+    음식이 입력되면 영양정보를 분석해줘
+    필수 요소는 칼로리, 탄수화물, 단백질, 지방이야
+    입력: {string}
+    
+    {format_instructions}
+    """
+).partial(format_instructions=output_parser.get_format_instructions())
+
+def do(param):
+    print(f"Received input: {param}")  # Debugging 출력 추가
+    prompt_value = prompt_template.invoke({"string": param})
+    model_output = model.invoke(prompt_value)
+    output = output_parser.invoke(model_output)
+    output_dict = output  # 이미 딕셔너리 형태로 반환됨
+    output_dict['food_name'] = param  # 음식 이름을 추가
+    print(f"Parsed output: {output_dict}")  # Debugging 출력 추가
+    return output_dict
+
+def save_to_db(user_id, nutrition_info):
+    connection = pymysql.connect(**db_config)
+    try:
+        with connection.cursor() as cursor:
+            sql = """
+                INSERT INTO FOOD (ID, DATE, FOOD_NAME, FOOD_PT, FOOD_FAT, FOOD_CH, FOOD_KCAL)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """
+            cursor.execute(sql, (
+                user_id,
+                datetime.now(),
+                nutrition_info['food_name'],
+                nutrition_info['protein'],
+                nutrition_info['fat'],
+                nutrition_info['carbohydrate'],
+                nutrition_info['calorie']
+            ))
+            print("Data saved to database")  # Debugging 출력 추가
+        connection.commit()
+    finally:
+        connection.close()
+
+@app.route('/api/send', methods=['POST'])
+def send():
+    data = request.json
+    user_id = data.get('user_id')
+    food_name = data.get('food_name')
+    
+    if not user_id or not food_name:
+        return jsonify({"error": "user_id and food_name are required"}), 400
+
+    nutrition_info = do(food_name)
+    
+    save_to_db(user_id, nutrition_info)
+    
+    return jsonify(nutrition_info)
+
+
+@app.route('/api/register', methods=['POST'])
+def register():
+    data = request.json
+    
+    if not data or 'id' not in data or 'pw' not in data:
         return jsonify({"error": "Invalid input"}), 400
 
     connection = create_db_connection()
@@ -54,15 +211,22 @@ def login():
         return jsonify({"error": "Database connection failed"}), 500
 
     try:
-        cursor = connection.cursor(dictionary=True)
-        query = "SELECT * FROM USER WHERE ID = %s AND PASSWORD = %s"
-        cursor.execute(query, (data["id"], data["password"]))
-        user = cursor.fetchone()
-
-        if user:
-            return jsonify({"message": "Login successful", "user": user})
-        else:
-            return jsonify({"error": "Invalid credentials"}), 401
+        cursor = connection.cursor()
+        query = """INSERT INTO USER (ID, PASSWORD, BODY_WEIGHT, HEIGHT, AGE, GENDER, ACTIVITY, RDI) 
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
+        values = (
+            data['id'],
+            data['pw'],
+            data['bodyweight'],
+            data['height'],
+            data['age'],
+            data['gender'],
+            data['activity'],
+            None  # RDI 값을 기본값으로 설정 (필요에 따라 계산 후 설정 가능)
+        )
+        cursor.execute(query, values)
+        connection.commit()
+        return jsonify({"message": "User registered successfully"}), 201
     except Error as e:
         print(f"Database query error: {e}")
         return jsonify({"error": "Database query failed"}), 500
@@ -75,56 +239,105 @@ def login():
 @app.route("/api/send", methods=["POST"])
 def send():
     data = request.json
-    user_id = data.get("user_id")
-    food_name = data.get("food_name")
+    year = data.get('year')
+    month = data.get('month')
+    UID = data.get('UID')
 
-    if not user_id or not food_name:
-        return jsonify({"error": "user_id and food_name are required"}), 400
-
-    print("!!! data:", data)  # Debugging output
-    nutrition_info = llm.do(food_name)
-    print(f"Parsed output: {nutrition_info}")  # Debugging output
+    print(UID)
+    if not year or not month:
+        return jsonify({"error": "Year and month are required"}), 400
 
     connection = create_db_connection()
     if connection is None:
         return jsonify({"error": "Database connection failed"}), 500
 
     try:
-        save_to_db(user_id, nutrition_info, connection)
-        print("success")
-        return jsonify(nutrition_info)
-    except Error as e:
-        print(f"Database operation error: {e}")
-        return jsonify({"error": "Database operation failed"}), 500
+        with connection.cursor() as cursor:
+            # UID를 사용하는 경우 쿼리문에 UID 조건 추가
+            sql = """
+                SELECT DATE, FOOD_INDEX, FOOD_NAME, FOOD_PT, FOOD_FAT, FOOD_CH, FOOD_KCAL
+                FROM FOOD
+                WHERE YEAR(DATE) = %s AND MONTH(DATE) = %s
+                AND ID = %s
+                ORDER BY DATE
+            """
+            cursor.execute(sql, (year, month, UID))
+            results = cursor.fetchall()
+            monthly_data = {}
+
+            for row in results:
+                day = row[0].day
+                food_info = {
+                    "food_index": row[1],
+                    "food_name": row[2],
+                    "protein": row[3],
+                    "fat": row[4],
+                    "carbohydrates": row[5],
+                    "calories": row[6]
+                }
+
+                # Ensuring the output order
+                food_info_ordered = {
+                    "food_index": food_info["food_index"],
+                    "food_name": food_info["food_name"],
+                    "protein": food_info["protein"],
+                    "fat": food_info["fat"],
+                    "carbohydrates": food_info["carbohydrates"],
+                    "calories": food_info["calories"]
+                }
+
+                if day not in monthly_data:
+                    monthly_data[day] = []
+
+                monthly_data[day].append(food_info_ordered)
+
+            # Create a list of 31 days, each day is a list of food items (which may be empty)
+            grouped_data = [monthly_data.get(day, []) for day in range(1, 32)]
+
+            return jsonify(grouped_data)
     finally:
         if connection.is_connected():
             connection.close()
 
+# 특정 음식을 삭제하는 엔드포인트
+@app.route('/api/delete_food', methods=['DELETE'])
+def delete_food():
+    print("음식삭제!")
+    user_id = request.args.get('ID')
+    date = request.args.get('DATE')
+    food_index = request.args.get('FOOD_INDEX')
 
-def save_to_db(user_id, nutrition_info, connection):
-    cursor = connection.cursor()
+    if not user_id or not date or not food_index:
+        return jsonify({"error": "필수 정보가 누락되었습니다."}), 400
+
+    connection = create_db_connection()
+    if connection is None:
+        return jsonify({"error": "데이터베이스 연결 실패"}), 500
+
     try:
-        sql = """
-        INSERT INTO FOOD (user_id, DATE, FOOD_NAME, FOOD_PT, FOOD_FAT, FOOD_CH, FOOD_KCAL)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        cursor = connection.cursor()
+        delete_query = """
+        DELETE FROM FOOD
+        WHERE ID = %s AND DATE = %s AND FOOD_INDEX = %s
         """
-        cursor.execute(
-            sql,
-            (
-                user_id,
-                datetime.now(),
-                nutrition_info['food_name'],
-                nutrition_info['protein'],
-                nutrition_info['fat'],
-                nutrition_info['carbohydrate'],
-                nutrition_info['calorie']
-            ),
-        )
-        print("Data saved to database")  # Debugging 출력 추가
+        cursor.execute(delete_query, (user_id, date, food_index))
         connection.commit()
+
+        if cursor.rowcount == 0:
+            return jsonify({"message": "삭제할 데이터가 없습니다."}), 404
+
+        return jsonify({"message": "음식이 성공적으로 삭제되었습니다."}), 200
+
+    except Error as e:
+        return jsonify({"error": str(e)}), 500
+
     finally:
-        connection.close()
+        if connection.is_connected():
+            cursor.close()
+            connection.close()
 
 
-if __name__ == "__main__":
-    app.run(debug=True)
+if __name__ == '__main__':
+    print("Starting Flask application")  # 디버깅 메시지
+    #insert_test_data()  # 애플리케이션 시작 시 테스트 데이터 삽입
+    app.run(host='0.0.0.0', port=5000)
