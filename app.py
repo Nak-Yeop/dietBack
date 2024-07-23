@@ -1,3 +1,8 @@
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import AzureChatOpenAI
+from langchain_core.pydantic_v1 import BaseModel, Field
+from langchain_core.output_parsers import JsonOutputParser
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import mysql.connector
@@ -6,12 +11,16 @@ from dotenv import load_dotenv
 import os
 import llm
 
+import pymysql
+from datetime import datetime
+
 app = Flask(__name__)
 CORS(app)  # Enable cross-origin requests
 
 # Load environment variables from .env
 load_dotenv()
 
+# Define db_config
 db_config = {
     "host": os.getenv("DB_HOST"),
     "database": os.getenv("DB_NAME"),
@@ -20,6 +29,7 @@ db_config = {
 }
 
 
+# Database connection function
 def create_db_connection():
     try:
         connection = mysql.connector.connect(
@@ -82,7 +92,8 @@ def send():
 
     try:
         save_to_db(user_id, nutrition_info, connection)
-        return jsonify({"message": "Data saved successfully"})
+        print("success")
+        return jsonify(nutrition_info)
     except Error as e:
         print(f"Database operation error: {e}")
         return jsonify({"error": "Database operation failed"}), 500
@@ -92,26 +103,28 @@ def send():
 
 
 def save_to_db(user_id, nutrition_info, connection):
+    cursor = connection.cursor()
     try:
-        cursor = connection.cursor()
-        query = """
-        INSERT INTO FOOD (user_id, food_name, calorie, carbohydrate, protein, fat)
-        VALUES (%s, %s, %s, %s, %s, %s)
+        sql = """
+        INSERT INTO FOOD (ID, DATE, FOOD_NAME, FOOD_PT, FOOD_FAT, FOOD_CH, FOOD_KCAL)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
         """
         cursor.execute(
-            query,
+            sql,
             (
                 user_id,
+                datetime.now(),
                 nutrition_info["food_name"],
-                nutrition_info["calorie"],
-                nutrition_info["carbohydrate"],
                 nutrition_info["protein"],
                 nutrition_info["fat"],
+                nutrition_info["carbohydrate"],
+                nutrition_info["calorie"],
             ),
         )
+        print("Data saved to database")  # Debugging 출력 추가
         connection.commit()
     finally:
-        cursor.close()
+        connection.close()
 
 
 if __name__ == "__main__":
