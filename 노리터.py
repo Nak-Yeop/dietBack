@@ -45,6 +45,7 @@ def create_db_connection():
         return None
 
 
+
 @app.route("/api/login", methods=["POST"])
 def login():
     data = request.json
@@ -203,7 +204,7 @@ def send():
     data = request.json
     user_id = data.get("user_id")
     food_name = data.get("food_name")
-         
+
     if not user_id or not food_name:
         return jsonify({"error": "user_id and food_name are required"}), 400
 
@@ -223,123 +224,13 @@ def send2():
         save_to_db(user_id, nutrition_info)
         return jsonify({"message": "good"}), 200
     except:
-        return jsonify({"message":"DB save error"}),500
+        return jsonify({"message": "DB save error"}), 500
 
 
-@app.route('/api/add_food', methods=['POST'])
-def add_food():
-    data = request.json
-    
-    user_id = data.get('ID')
-    date = data.get('DATE')
-    food_name = data.get('FOOD_NAME')
-    
-    if not user_id or not date or not food_name:
-        return jsonify({"error": "필수 정보가 누락되었습니다."}), 400
-
-    # LLM을 통해 음식 영양 정보를 가져옴
-    nutrition_info = do(food_name)
-
-    try:
-        connection = pymysql.connect(**db_config)
-        with connection.cursor() as cursor:
-            # FOOD_INDEX를 구함 (해당 날짜의 가장 높은 인덱스를 찾아 +1)
-            cursor.execute("SELECT MAX(FOOD_INDEX) FROM FOOD WHERE ID = %s AND DATE = %s", (user_id, date))
-            max_index = cursor.fetchone()[0]
-            food_index = max_index + 1 if max_index is not None else 0
-
-            insert_query = """
-            INSERT INTO FOOD (ID, DATE, FOOD_INDEX, FOOD_NAME, FOOD_CH, FOOD_PT, FOOD_FAT, FOOD_KCAL)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            """
-            cursor.execute(insert_query, (
-                user_id, date, food_index,
-                nutrition_info['food_name'],
-                nutrition_info['carbohydrate'],
-                nutrition_info['protein'],
-                nutrition_info['fat'],
-                nutrition_info['calorie']
-            ))
-            connection.commit()
-
-            added_food_info = {
-                "ID": user_id,
-                "DATE": date,
-                "FOOD_INDEX": food_index,
-                "food_name": nutrition_info['food_name'],
-                "carbohydrates": nutrition_info['carbohydrate'],
-                "protein": nutrition_info['protein'],
-                "fat": nutrition_info['fat'],
-                "calorie": nutrition_info['calorie']
-            }
-            print(added_food_info)
-            return jsonify({"message": "음식이 성공적으로 추가되었습니다.", "data": added_food_info}), 201
-
-    except pymysql.MySQLError as e:
-        return jsonify({"error": str(e)}), 500
-
-    finally:
-        connection.close()
-
-@app.route('/api/update_food', methods=['POST'])
-def update_food():
-    data = request.json
-
-    user_id = data.get('ID')
-    date = data.get('DATE')
-    food_index = data.get('FOOD_INDEX')
-    new_food_name = data.get('NEW_FOOD_NAME')
-    
-    if not user_id or not date or not food_index or not new_food_name:
-        return jsonify({"error": "필수 정보가 누락되었습니다."}), 400
-
-    # LLM을 통해 새로운 음식 영양 정보를 가져옴
-    new_nutrition_info = do(new_food_name)
-
-    try:
-        connection = pymysql.connect(**db_config)
-        with connection.cursor() as cursor:
-            update_query = """
-            UPDATE FOOD
-            SET FOOD_NAME = %s, FOOD_CH = %s, FOOD_PT = %s, FOOD_FAT = %s, FOOD_KCAL = %s
-            WHERE ID = %s AND DATE = %s AND FOOD_INDEX = %s
-            """
-            cursor.execute(update_query, (
-                new_nutrition_info['food_name'],
-                new_nutrition_info['carbohydrate'],
-                new_nutrition_info['protein'],
-                new_nutrition_info['fat'],
-                new_nutrition_info['calorie'],
-                user_id, date, food_index
-            ))
-            connection.commit()
-          
-            updated_food_info = {
-                "ID": user_id,
-                "DATE": date,
-                "FOOD_INDEX": food_index,
-                "food_name": new_nutrition_info['food_name'],
-                "carbohydrates": new_nutrition_info['carbohydrate'],
-                "protein": new_nutrition_info['protein'],
-                "fat": new_nutrition_info['fat'],
-                "calorie": new_nutrition_info['calorie']
-            }
-          
-            return jsonify({"message": "음식이 성공적으로 수정되었습니다.", "data": updated_food_info}), 200
-
-    except pymysql.MySQLError as e:
-        return jsonify({"error": str(e)}), 500
-
-    finally:
-        connection.close()
-
-    
-
-
-
-@app.route("/api/register", methods=["POST"])
+@app.route("/api/register", methods=["POST", "PUT"])
 def register():
     data = request.json
+
     if not data or "id" not in data or "pw" not in data:
         return jsonify({"error": "Invalid input"}), 400
 
@@ -361,17 +252,15 @@ def register():
                 data["age"],
                 data["gender"],
                 data["activity"],
-                None,  # RDI 값을 기본값으로 설정 (필요에 따라 계산 후 설정 가능)
+                data["RDI"]  # RDI 값을 기본값으로 설정 (필요에 따라 계산 후 설정 가능)
             )
             cursor.execute(query, values)
             connection.commit()
             return jsonify({"message": "User registered successfully"}), 201
         elif request.method == "PUT":
-            print("!!!data: ", data)
             # PUT 요청: 기존 사용자 정보 업데이트
             query = """UPDATE USER SET PASSWORD=%s, BODY_WEIGHT=%s, HEIGHT=%s, AGE=%s, GENDER=%s, ACTIVITY=%s, RDI=%s 
                        WHERE ID=%s"""
-                       
             values = (
                 data["pw"],
                 data["bodyweight"],
@@ -379,12 +268,11 @@ def register():
                 data["age"],
                 data["gender"],
                 data["activity"],
-                None,  # RDI 값을 기본값으로 설정 (필요에 따라 계산 후 설정 가능)
-                data["id"],
+                data["RDI"], 
+                data["id"]
             )
             cursor.execute(query, values)
             connection.commit()
-            print(cursor)
             if cursor.rowcount == 0:
                 return jsonify({"error": "User not found"}), 404
             return jsonify({"message": "User updated successfully"}), 200
@@ -395,7 +283,6 @@ def register():
         if connection.is_connected():
             cursor.close()
             connection.close()
-            print("할거다함")
 
 
 # 특정 음식을 삭제하는 엔드포인트
