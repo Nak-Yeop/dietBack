@@ -21,7 +21,7 @@ db_config = {
 def get_monthly_food():
     year = request.args.get('year')
     month = request.args.get('month')
-
+    
     if not year or not month:
         return jsonify({"error": "Year and month are required"}), 400
 
