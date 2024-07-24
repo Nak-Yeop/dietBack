@@ -171,8 +171,10 @@ def do(param):
 
 def save_to_db(user_id, nutrition_info):
     connection = create_db_connection()
+    print(1)
     try:
         with connection.cursor() as cursor:
+            print(2)
             sql = """
                 INSERT INTO FOOD (ID, DATE, FOOD_NAME, FOOD_PT, FOOD_FAT, FOOD_CH, FOOD_KCAL)
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
@@ -216,6 +218,7 @@ def send2():
     data = request.json
     user_id = data.get("user_id")
     nutrition_info = data.get("nutrition_info")
+    print(data)
     try:
         save_to_db(user_id, nutrition_info)
         return jsonify({"message": "good"}), 200
@@ -334,7 +337,7 @@ def update_food():
 
 
 
-@app.route("/api/register", methods=["POST"])
+@app.route("/api/register", methods=["POST", "PUT"])
 def register():
     data = request.json
     if not data or "id" not in data or "pw" not in data:
@@ -363,12 +366,11 @@ def register():
             cursor.execute(query, values)
             connection.commit()
             return jsonify({"message": "User registered successfully"}), 201
+
         elif request.method == "PUT":
-            print("!!!data: ", data)
             # PUT 요청: 기존 사용자 정보 업데이트
-            query = """UPDATE USER SET PASSWORD=%s, BODY_WEIGHT=%s, HEIGHT=%s, AGE=%s, GENDER=%s, ACTIVITY=%s, RDI=%s 
+            query = """UPDATE USER SET PASSWORD=%s, BODY_WEIGHT=%s, HEIGHT=%s, AGE=%s, GENDER=%s, ACTIVITY=%s
                        WHERE ID=%s"""
-                       
             values = (
                 data["pw"],
                 data["bodyweight"],
@@ -376,15 +378,30 @@ def register():
                 data["age"],
                 data["gender"],
                 data["activity"],
-                None,  # RDI 값을 기본값으로 설정 (필요에 따라 계산 후 설정 가능)
                 data["id"],
             )
             cursor.execute(query, values)
             connection.commit()
-            print(cursor)
+            
             if cursor.rowcount == 0:
                 return jsonify({"error": "User not found"}), 404
-            return jsonify({"message": "User updated successfully"}), 200
+            
+           # USER_NT 테이블에서 RD_PROTEIN, RD_CARBO, RD_FAT 값을 가져옴
+            query_nutrients = """SELECT RD_PROTEIN, RD_CARBO, RD_FAT FROM USER_NT WHERE ID=%s"""
+            cursor.execute(query_nutrients, (data["id"],))
+            nutrients_result = cursor.fetchone()
+            
+            if nutrients_result is None:
+                return jsonify({"error": "User NT not found"}), 404
+            
+            rd_protein, rd_carbo, rd_fat = nutrients_result
+            return jsonify({
+                "message": "User updated successfully",
+                "RD_PROTEIN": rd_protein,
+                "RD_CARBO": rd_carbo,
+                "RD_FAT": rd_fat
+            }), 200
+
     except Error as e:
         print(f"Database query error: {e}")
         return jsonify({"error": "Database query failed"}), 500
@@ -392,8 +409,6 @@ def register():
         if connection.is_connected():
             cursor.close()
             connection.close()
-            print("할거다함")
-
 
 # 특정 음식을 삭제하는 엔드포인트
 @app.route("/api/delete_food", methods=["DELETE"])
