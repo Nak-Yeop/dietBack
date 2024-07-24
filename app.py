@@ -366,7 +366,7 @@ def register():
         elif request.method == "PUT":
             print("!!!data: ", data)
             # PUT 요청: 기존 사용자 정보 업데이트
-            query = """UPDATE USER SET PASSWORD=%s, BODY_WEIGHT=%s, HEIGHT=%s, AGE=%s, GENDER=%s, ACTIVITY=%s, RDI=%s 
+            query = """UPDATE USER SET PASSWORD=%s, BODY_WEIGHT=%s, HEIGHT=%s, AGE=%s, GENDER=%s, ACTIVITY=%s
                        WHERE ID=%s"""
                        
             values = (
@@ -376,7 +376,6 @@ def register():
                 data["age"],
                 data["gender"],
                 data["activity"],
-                None,  # RDI 값을 기본값으로 설정 (필요에 따라 계산 후 설정 가능)
                 data["id"],
             )
             cursor.execute(query, values)
