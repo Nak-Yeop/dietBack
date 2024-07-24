@@ -139,6 +139,7 @@ model = AzureChatOpenAI(
 
 
 class NutritionInfo(BaseModel):
+    food_name:str = Field(description="The food name")
     calorie: str = Field(description="The amount of Calories")
     carbohydrate: str = Field(description="The amount of Carbohydrate")
     protein: str = Field(description="The amount of Protein")
@@ -150,7 +151,7 @@ output_parser = JsonOutputParser(pydantic_object=NutritionInfo)
 prompt_template = ChatPromptTemplate.from_template(
     """
     음식이 입력되면 영양정보를 분석해줘
-    필수 요소는 칼로리, 탄수화물, 단백질, 지방이야
+    필수 요소는 음식 이름, 칼로리, 탄수화물, 단백질, 지방이야
     입력: {string}
     
     {format_instructions}
@@ -163,10 +164,7 @@ def do(param):
     prompt_value = prompt_template.invoke({"string": param})
     model_output = model.invoke(prompt_value)
     output = output_parser.invoke(model_output)
-    output_dict = output  # 이미 딕셔너리 형태로 반환됨
-    output_dict["food_name"] = param  # 음식 이름을 추가
-    print(f"Parsed output: {output_dict}")  # Debugging 출력 추가
-    return output_dict
+    return output
 
 
 def save_to_db(user_id, nutrition_info):
