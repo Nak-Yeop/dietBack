@@ -226,7 +226,6 @@ def send2():
 @app.route("/api/register", methods=["POST", "PUT"])
 def register():
     data = request.json
-
     if not data or "id" not in data or "pw" not in data:
         return jsonify({"error": "Invalid input"}), 400
 
@@ -254,9 +253,11 @@ def register():
             connection.commit()
             return jsonify({"message": "User registered successfully"}), 201
         elif request.method == "PUT":
+            print("!!!data: ", data)
             # PUT 요청: 기존 사용자 정보 업데이트
             query = """UPDATE USER SET PASSWORD=%s, BODY_WEIGHT=%s, HEIGHT=%s, AGE=%s, GENDER=%s, ACTIVITY=%s, RDI=%s 
                        WHERE ID=%s"""
+                       
             values = (
                 data["pw"],
                 data["bodyweight"],
@@ -269,6 +270,7 @@ def register():
             )
             cursor.execute(query, values)
             connection.commit()
+            print(cursor)
             if cursor.rowcount == 0:
                 return jsonify({"error": "User not found"}), 404
             return jsonify({"message": "User updated successfully"}), 200
@@ -279,6 +281,7 @@ def register():
         if connection.is_connected():
             cursor.close()
             connection.close()
+            print("할거다함")
 
 
 # 특정 음식을 삭제하는 엔드포인트
