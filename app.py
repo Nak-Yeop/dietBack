@@ -210,14 +210,15 @@ def send():
 
     return jsonify(nutrition_info)
 
+
 @app.route("/api/send2", methods=["POST"])
 def send2():
     data = request.json
     user_id = data.get("user_id")
-    nutrition_info= data.get("nutrition_info")
+    nutrition_info = data.get("nutrition_info")
     try:
         save_to_db(user_id, nutrition_info)
-        return jsonify({"message":"good"}),200
+        return jsonify({"message": "good"}), 200
     except:
         return jsonify({"message":"DB save error"}),500
 
@@ -336,7 +337,6 @@ def update_food():
 @app.route("/api/register", methods=["POST"])
 def register():
     data = request.json
-
     if not data or "id" not in data or "pw" not in data:
         return jsonify({"error": "Invalid input"}), 400
 
@@ -346,21 +346,45 @@ def register():
 
     try:
         cursor = connection.cursor()
-        query = """INSERT INTO USER (ID, PASSWORD, BODY_WEIGHT, HEIGHT, AGE, GENDER, ACTIVITY, RDI) 
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
-        values = (
-            data["id"],
-            data["pw"],
-            data["bodyweight"],
-            data["height"],
-            data["age"],
-            data["gender"],
-            data["activity"],
-            None,  # RDI 값을 기본값으로 설정 (필요에 따라 계산 후 설정 가능)
-        )
-        cursor.execute(query, values)
-        connection.commit()
-        return jsonify({"message": "User registered successfully"}), 201
+        if request.method == "POST":
+            # POST 요청: 새로운 사용자 등록
+            query = """INSERT INTO USER (ID, PASSWORD, BODY_WEIGHT, HEIGHT, AGE, GENDER, ACTIVITY, RDI) 
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
+            values = (
+                data["id"],
+                data["pw"],
+                data["bodyweight"],
+                data["height"],
+                data["age"],
+                data["gender"],
+                data["activity"],
+                None,  # RDI 값을 기본값으로 설정 (필요에 따라 계산 후 설정 가능)
+            )
+            cursor.execute(query, values)
+            connection.commit()
+            return jsonify({"message": "User registered successfully"}), 201
+        elif request.method == "PUT":
+            print("!!!data: ", data)
+            # PUT 요청: 기존 사용자 정보 업데이트
+            query = """UPDATE USER SET PASSWORD=%s, BODY_WEIGHT=%s, HEIGHT=%s, AGE=%s, GENDER=%s, ACTIVITY=%s, RDI=%s 
+                       WHERE ID=%s"""
+                       
+            values = (
+                data["pw"],
+                data["bodyweight"],
+                data["height"],
+                data["age"],
+                data["gender"],
+                data["activity"],
+                None,  # RDI 값을 기본값으로 설정 (필요에 따라 계산 후 설정 가능)
+                data["id"],
+            )
+            cursor.execute(query, values)
+            connection.commit()
+            print(cursor)
+            if cursor.rowcount == 0:
+                return jsonify({"error": "User not found"}), 404
+            return jsonify({"message": "User updated successfully"}), 200
     except Error as e:
         print(f"Database query error: {e}")
         return jsonify({"error": "Database query failed"}), 500
@@ -368,6 +392,7 @@ def register():
         if connection.is_connected():
             cursor.close()
             connection.close()
+            print("할거다함")
 
 
 # 특정 음식을 삭제하는 엔드포인트
@@ -406,12 +431,13 @@ def delete_food():
             cursor.close()
             connection.close()
 
-@app.route('/api/monthly', methods=['POST'])
+
+@app.route("/api/monthly", methods=["POST"])
 def get_monthly_food():
     data = request.json
-    year = data.get('year') 
-    month = data.get('month')
-    UID = data.get('UID')
+    year = data.get("year")
+    month = data.get("month")
+    UID = data.get("UID")
     if not year or not month:
         return jsonify({"error": "Year and month are required"}), 400
 
@@ -437,7 +463,7 @@ def get_monthly_food():
                     "protein": row[3],
                     "fat": row[4],
                     "carbohydrates": row[5],
-                    "calories": row[6]
+                    "calories": row[6],
                 }
 
                 # Ensuring the output order
@@ -447,7 +473,7 @@ def get_monthly_food():
                     "protein": food_info["protein"],
                     "fat": food_info["fat"],
                     "carbohydrates": food_info["carbohydrates"],
-                    "calories": food_info["calories"]
+                    "calories": food_info["calories"],
                 }
 
                 if day not in monthly_data:
@@ -461,6 +487,8 @@ def get_monthly_food():
             return jsonify(grouped_data)
     finally:
         connection.close()
+
+
 if __name__ == "__main__":
     print("Starting Flask application")  # 디버깅 메시지
     # insert_test_data()  # 애플리케이션 시작 시 테스트 데이터 삽입
