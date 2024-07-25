@@ -414,8 +414,9 @@ def register():
                 return jsonify({"error": "User not found"}), 404
             
             # USER_NT 테이블에서 RD_PROTEIN, RD_CARBO, RD_FAT 값을 가져옴
+            user_id=data.get("id")
             query_nutrients = """SELECT RD_PROTEIN, RD_CARBO, RD_FAT FROM USER_NT WHERE ID=%s"""
-            cursor.execute(query_nutrients, (data["id"],))
+            cursor.execute(query_nutrients, (user_id))
           
             nutrients_result = cursor.fetchone()
             
@@ -424,10 +425,9 @@ def register():
             
             rd_protein, rd_carbo, rd_fat = nutrients_result
             return jsonify({
-                "message": "User updated successfully",
-                "RD_PROTEIN": 1, #test용으로 더미값 넣어놓음
-                "RD_CARBO": 2,
-                "RD_FAT": 3
+                "RD_PROTEIN": rd_protein, #test용으로 더미값 넣어놓음
+                "RD_CARBO": rd_carbo,
+                "RD_FAT": rd_fat
             }), 200
 
     except Error as e:
