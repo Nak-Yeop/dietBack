@@ -23,8 +23,40 @@ def create_db_connection():
         print(f"Error connecting to MySQL: {e}")
         return None
 
-@app.route("/api/register", methods=["POST", "PUT"])
+@app.route("/api/register", methods=["GET", "POST", "PUT"])
 def register():
+    if request.method == "GET":
+        user_id = request.args.get("id")
+        if not user_id:
+            return jsonify({"error": "User ID is required"}), 400
+
+        connection = create_db_connection()
+        if connection is None:
+            return jsonify({"error": "Database connection failed"}), 500
+
+        try:
+            cursor = connection.cursor()
+            query_nutrients = """SELECT RD_PROTEIN, RD_CARBO, RD_FAT FROM USER_NT WHERE ID=%s"""
+            cursor.execute(query_nutrients, (user_id,))
+            nutrients_result = cursor.fetchone()
+
+            if nutrients_result is None:
+                return jsonify({"error": "User NT not found"}), 404
+
+            rd_protein, rd_carbo, rd_fat = nutrients_result
+            return jsonify({
+                "RD_PROTEIN": rd_protein,
+                "RD_CARBO": rd_carbo,
+                "RD_FAT": rd_fat,
+            }), 200
+        except Error as e:
+            print(f"Database query error: {e}")
+            return jsonify({"error": "Database query failed"}), 500
+        finally:
+            if connection.is_connected():
+                cursor.close()
+                connection.close()
+
     data = request.json
 
     if not data or "id" not in data or "pw" not in data:
@@ -37,7 +69,6 @@ def register():
     try:
         cursor = connection.cursor()
         
-        # Check if it's a PUT request to update user information
         if request.method == "PUT":
             query = """UPDATE USER SET PASSWORD=%s, BODY_WEIGHT=%s, HEIGHT=%s, AGE=%s, ACTIVITY=%s WHERE ID=%s"""
             values = (
